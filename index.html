@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    
+    <!-- Use jquery for ajax and dom manipulation -->
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    
+    <!-- Use spin.js for feedback in the UI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.min.js"></script>
+    
+    <!-- Use lodash for functional array handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="well">
+                    <header>
+                        <h3>Choose your filters...</h3>
+                    </header>
+                    <form id="curriculum-filters">
+                        <div>
+                            <label><input type="checkbox" name="level" value="guide"> Instructor Guides</label>
+                        </div>
+                        <div>
+                            <label><input type="checkbox" name="level" value="level-1"> Level 1</label>
+                        </div>
+                        <div>
+                            <label><input type="checkbox" name="level" value="level-2"> Level 2</label>
+                        </div>
+                        <div>
+                            <label><input type="checkbox" name="level" value="level-3"> Level 3</label>
+                        </div>
+                        <div>
+                            <label><input type="checkbox" name="level" value="level-4"> Level 4</label>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <section class="col-md-offset-1 col-md-8" id="curriculum-list"></section>
+        </div>
+    </div>
+    
+    <script>
+        //
+        // Create a spinner that we'll use later on.
+        // 
+        var opts = {
+              lines: 13 // The number of lines to draw
+            , length: 28 // The length of each line
+            , width: 14 // The line thickness
+            , radius: 42 // The radius of the inner circle
+            , scale: 1 // Scales overall size of the spinner
+            , corners: 1 // Corner roundness (0..1)
+            , color: '#000' // #rgb or #rrggbb or array of colors
+            , opacity: 0.25 // Opacity of the lines
+            , rotate: 0 // The rotation offset
+            , direction: 1 // 1: clockwise, -1: counterclockwise
+            , speed: 1 // Rounds per second
+            , trail: 60 // Afterglow percentage
+            , fps: 20 // Frames per second when using setTimeout() as a fallback for CSS
+            , zIndex: 2e9 // The z-index (defaults to 2000000000)
+            , className: 'spinner' // The CSS class to assign to the spinner
+            , top: '50%' // Top position relative to parent
+            , left: '50%' // Left position relative to parent
+            , shadow: false // Whether to render a shadow
+            , hwaccel: false // Whether to use hardware acceleration
+            , position: 'absolute' // Element positioning
+        }
+        var spinner = new Spinner(opts);
+    </script>
+    
+    <script>
+        curriculumList = document.getElementById('curriculum-list');
+        filterForm = document.getElementById('curriculum-filters');
+
+        // Construct a repository query to send to GitHub
+        function buildCurriculumQuery() {
+            var checkedLevels = $(filterForm).find('[name="level"]:checked');
+            var q = 'user:codedbykids-curriculum';
+            checkedLevels.each(function(index, elem) {
+                q += ' "' + elem.value + '"';
+            })
+            return q;
+        }
+
+        // Using the currently selected filters, query github for the matching repositories
+        // and display in a list, grouped by type of repo.
+        function loadCurriculumList() {
+            // Show a spinner for activity
+            spinner.spin(curriculumList);
+
+            // Request the repositories from GitHub
+            $.ajax({
+                url: 'https://api.github.com/search/repositories',
+                data: {
+                    q: buildCurriculumQuery()
+                },
+                dataType: 'json'
+            })
+            
+            // When the results come back, construct new HTML to show
+            .then(function(data) {
+                var repositoryGroups = {
+                    'guide': 'Instructor Guides', 
+                    'level-1': 'Level 1', 
+                    'level-2': 'Level 2', 
+                    'level-3': 'Level 3', 
+                    'level-4': 'Level 4'
+                };
+                var curriculumListHtml = '';
+
+                _.each(repositoryGroups, function(label, tag) {
+                    var items = _.filter(data.items, function(item) { 
+                        return (item.name && item.name.indexOf(tag) != -1) || 
+                            (item.description && item.description.indexOf(tag) != -1); 
+                    });
+                    if (items.length) {
+                        curriculumListHtml += '<h2>' + label + '</h2>'
+                        curriculumListHtml += '<ul>';
+                        $.each(items, function(index, item) {
+                            curriculumListHtml += 
+                                '<li>' +
+                                '<a href="' + item.html_url + '" target="_blank">' + item.name + '</a>' +
+                                '</li>';
+                        });
+                        curriculumListHtml += '</ul>';
+                    }
+                });
+                $(curriculumList).html(curriculumListHtml);
+            })
+        }
+
+        // Load a full curriculum list immediately
+        loadCurriculumList();
+        
+        // Also, whenever some filter criteria changes on the form, reload the list
+        $(filterForm).find('input').on('change', loadCurriculumList);
+    </script>
+</body>
+</html>
